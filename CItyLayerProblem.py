@@ -86,6 +86,30 @@ def ParseListToVectors(list_dicts, callback):
 
 vector_2d = GetVectorConstructor(2 , ['x' , 'y'])
 
+vectors_2D = GetVectorConstructor(2 , ['x' , 'y'])
+
+def ApplyAlgorithm(list_of_vectors):
+    if len(list_of_vectors) <= 0:
+        return
+    # normalized vector
+    start = list_of_vectors[0]
+    
+    prev_vector , flag = GetResultantVector(start, list_of_vectors[1])
+    curr_vector = None
+    angle_sum = 0 
+    for i in range(2 , len(list_of_vectors) , 1):
+        curr_vector, flag = GetResultantVector(start , list_of_vectors[i])
+        if not flag: 
+            #TODO: add more details about the exception
+            raise Exception("couldn't get resultant vector")
+        angle_sum += GetAngleWrapper(curr_vector , prev_vector)
+        prev_vector = curr_vector
+
+    return angle_sum
+
+
+
+
 
 class MyHandler(BaseHTTPRequestHandler):
 
@@ -99,10 +123,7 @@ class MyHandler(BaseHTTPRequestHandler):
             print("Parsed JSON:", data)
             # print("firest data point ", type(data[0]))
             test = ParseListToVectors(data , vector_2d)
-            for item in test:
-                print(item)
-            print("printing out the test variable ")
-            print(test)
+            print("angle sum of the list of vectors ",ApplyAlgorithm(test))
         except json.JSONDecodeError:
             self.send_error(400, "Invalid JSON")
             return
@@ -120,7 +141,6 @@ def run():
     server.serve_forever()
 run()
 
-# vectors_2D = GetVectorConstructor(2 , ['x' , 'y'])
 
 # vec1 = vectors_2D(x = 1 , y = 2)
 # vec2 = vectors_2D(x = 4 , y = 5)
