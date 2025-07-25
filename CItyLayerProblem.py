@@ -1,188 +1,141 @@
-import math 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import math
 import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
-def GetVectorConstructor(dim , dim_name):
-    def CreateVector(**kwargs):
+
+def make_vector_factory(dim: int, dim_names: list[str]):
+    def create_vector(**kwargs):
+        if len(kwargs) != dim:
+            raise ValueError("Dimension mismatch: expected %d keys" % dim)
         vector = {}
-        if(len(kwargs) != dim):
-            raise Exception("dimension mismatch")
-        for key , val in kwargs.items():
-            # TODO: check the var type of key an val
-            # they should be str and float
-            if not key in dim_name:
-                raise Exception("dimension name mismatch")
-            vector[key] = val
-        vector["dim"] = dim 
-        vector["dim_name"] = [x for x in dim_name]
+        for key, val in kwargs.items():
+            if not isinstance(key, str) or not isinstance(val, (int, float)):
+                raise TypeError("Key must be str and value must be float or int")
+            if key not in dim_names:
+                raise ValueError(f"Unexpected dimension name: {key}")
+            vector[key] = float(val)
+        vector["dim"] = dim
+        vector["dim_name"] = list(dim_names)
         return vector
-    return CreateVector
+    return create_vector
 
 
-# this will give you the vectorbetween two points
-# if we have points or origin vectors OA and OB
-# this function will give you the OA - OB, assuming the first parameter passed was OA
-def GetResultantVector(vec2 , vec1):
-    if not CheckIfTwoVectorsFallInTheVectorSpace(vec2 , vec1):
-        return None , False
-    vector_constructor = GetVectorConstructor(vec2['dim'] , vec2['dim_name'])
-    resultant_vector = {}
-    for dim_n in vec2['dim_name']:
-        resultant_vector[dim_n] = vec2[dim_n] - vec1[dim_n]
-    return vector_constructor(**resultant_vector), True
+def subtract_vectors(v1, v2):
+    if not are_vectors_compatible(v1, v2):
+        raise ValueError("Vectors are not in the same vector space")
+
+    factory = make_vector_factory(v1['dim'], v1['dim_name'])
+    diff = {dim: v1[dim] - v2[dim] for dim in v1['dim_name']}
+    return factory(**diff)
 
 
-def CheckIfTwoVectorsFallInTheVectorSpace(vec2 , vec1):
-    vecDimMismatch = Exception('vector dimension mismatch')
-    vecDimNameMismatch = Exception('vector dimension name mismatch')
+def are_vectors_compatible(v1, v2):
     try:
-        if vec2['dim'] != vec1['dim']:
-            raise vecDimMismatch
-        if len(vec2['dim_name']) != len(vec1['dim_name']):
-            raise vecDimMismatch
-        dim_set = set()
-        for v2_dim in vec2['dim_name']:
-            dim_set.add(v2_dim)
-        for v1_dim in vec1['dim_name']:
-            if not v1_dim in dim_set:
-                raise vecDimNameMismatch
-        return True
-    except:
+        return (
+            v1['dim'] == v2['dim'] and
+            set(v1['dim_name']) == set(v2['dim_name'])
+        )
+    except (KeyError, TypeError):
         return False
 
 
+def signed_angle_2d(from_vec, to_vec):
+    if not are_vectors_compatible(from_vec, to_vec):
+        raise ValueError("Incompatible vectors for angle calculation")
 
-def GetAngleWrapper(vec2 , vec1):
-    rad , flag = GetSignedAngle2D(vec1 , vec2)
-    if not flag:
-        return None 
-    return RadiansToDegrees(rad)
+    if from_vec["dim"] != 2 or set(from_vec["dim_name"]) != {"x", "y"}:
+        raise ValueError("Only 2D vectors with dimensions 'x' and 'y' are supported")
 
-
-
-def GetSignedAngle2D(vec2, vec1):
-    if not CheckIfTwoVectorsFallInTheVectorSpace(vec2, vec1):
-        return None, False
-    
-    # Only supports 2D vectors
-    if vec2["dim"] != 2 or set(vec2["dim_name"]) != {"x", "y"}:
-        raise Exception("Only 2D vectors with 'x' and 'y' components are supported.")
-
-    x1, y1 = vec1["x"], vec1["y"]
-    x2, y2 = vec2["x"], vec2["y"]
+    x1, y1 = from_vec["x"], from_vec["y"]
+    x2, y2 = to_vec["x"], to_vec["y"]
 
     dot = x1 * x2 + y1 * y2
-    det = x1 * y2 - y1 * x2  # determinant (like 2D cross product)
+    det = x1 * y2 - y1 * x2
 
-    angle_radians = math.atan2(det, dot)
-    return angle_radians, True
-
-def RadiansToDegrees(radians):
-    return math.degrees(radians)
-
-def ParseListToVectors(list_dicts, callback):
-    return map(lambda d: callback(**d), list_dicts)
-
-vector_2d = GetVectorConstructor(2 , ['x' , 'y'])
-
-vectors_2D = GetVectorConstructor(2 , ['x' , 'y'])
-
-def ApplyAlgorithm(list_of_vectors):
-    if len(list_of_vectors) <= 0:
-        return
-    # normalized vector
-    start = list_of_vectors[0]
-    
-    prev_vector , flag = GetResultantVector(start, list_of_vectors[1])
-    curr_vector = None
-    angle_sum = 0 
-    for i in range(2 , len(list_of_vectors) , 1):
-        curr_vector, flag = GetResultantVector(start , list_of_vectors[i])
-        if not flag: 
-            #TODO: add more details about the exception
-            raise Exception("couldn't get resultant vector")
-        angle_sum += GetAngleWrapper(curr_vector , prev_vector)
-        prev_vector = curr_vector
-
-    return angle_sum
+    return math.atan2(det, dot)
 
 
+def radians_to_degrees(rad):
+    return math.degrees(rad)
 
 
+def angle_between_vectors(from_vec, to_vec):
+    try:
+        rad = signed_angle_2d(from_vec, to_vec)
+        return radians_to_degrees(rad)
+    except Exception as e:
+        return None
 
-class MyHandler(BaseHTTPRequestHandler):
 
+def parse_vectors(vector_dicts, vector_factory):
+    return [vector_factory(**vec) for vec in vector_dicts]
+
+
+def total_rotation_angle(vector_list):
+    if len(vector_list) < 3:
+        raise ValueError("At least 3 vectors are required for angle calculation")
+
+    origin = vector_list[0]
+    prev = subtract_vectors(origin, vector_list[1])
+    total_angle = 0
+
+    for vec in vector_list[2:]:
+        current = subtract_vectors(origin, vec)
+        angle = angle_between_vectors(prev, current)
+        if angle is None:
+            raise ValueError("Failed to calculate angle between vectors")
+        total_angle += angle
+        prev = current
+
+    return total_angle
+
+
+class VectorHandler(BaseHTTPRequestHandler):
     def do_POST(self):
-        content_length = int(self.headers.get('Content-Length', 0))
-        raw_body = self.rfile.read(content_length)
-        body_str = raw_body.decode('utf-8')
-        print("Raw body string:", body_str)
         try:
-            data = json.loads(body_str)
-            print("Parsed JSON:", data)
-            # print("firest data point ", type(data[0]))
-            test = ParseListToVectors(data , vector_2d)
-            print("angle sum of the list of vectors ",ApplyAlgorithm(test))
-        except json.JSONDecodeError:
-            self.send_error(400, "Invalid JSON")
-            return
+            content_length = int(self.headers.get('Content-Length', 0))
+            raw_body = self.rfile.read(content_length)
+            data = json.loads(raw_body.decode('utf-8'))
 
-        # 5. Respond with something
-        self.send_response(200)
+            vector_factory = make_vector_factory(2, ['x', 'y'])
+            vectors = parse_vectors(data, vector_factory)
+
+            angle = total_rotation_angle(vectors)
+
+            response = {
+                "status": "success",
+                "angle_sum_degrees": angle
+            }
+
+            self._send_response(200, response)
+
+        except json.JSONDecodeError:
+            self._send_response(400, {"error": "Invalid JSON"})
+        except ValueError as e:
+            self._send_response(400, {"error": str(e)})
+        except Exception as e:
+            self._send_response(500, {"error": f"Internal server error: {str(e)}"})
+
+    def _send_response(self, code, data):
+        self.send_response(code)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
-        response = {"status": "received", "data": data}
-        self.wfile.write(json.dumps(response).encode('utf-8'))
+        self.wfile.write(json.dumps(data).encode('utf-8'))
 
-def run():
-    server = HTTPServer(('0.0.0.0', 8080), MyHandler)
+
+def run_server():
+    server = HTTPServer(('0.0.0.0', 8080), VectorHandler)
     print("Listening on http://localhost:8080")
     server.serve_forever()
-run()
 
 
-# vec1 = vectors_2D(x = 1 , y = 2)
-# vec2 = vectors_2D(x = 4 , y = 5)
-
-# print(GetAngleWrapper(vec2 , vec1))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
+if __name__ == "__main__":
+    #run_server()
+    vector_2d_constructor = make_vector_factory(2 , ['x' , 'y'])
+    vec1 = vector_2d_constructor(x=1 , y=1)
+    vec2 = vector_2d_constructor(x=4 , y=5)
+    vec3 = subtract_vectors(vec2 , vec1)
+    angle = angle_between_vectors(vec1 , vec2)
+    print(angle)
+    #print(vec3)
