@@ -67,13 +67,13 @@ func printList(head *ListNode) {
 	fmt.Println("nil")
 }
 
-// Test the function
-func main() {
-	head := createList([]int{1, 2, 3, 4})
-	fmt.Println("Original list:")
-	printList(head)
+// // Test the function
+// func main() {
+// 	head := createList([]int{1, 2, 3, 4})
+// 	fmt.Println("Original list:")
+// 	printList(head)
 
-	newHead := swapPairs(head)
-	fmt.Println("After swapping pairs:")
-	printList(newHead)
-}
+// 	newHead := swapPairs(head)
+// 	fmt.Println("After swapping pairs:")
+// 	printList(newHead)
+// }
