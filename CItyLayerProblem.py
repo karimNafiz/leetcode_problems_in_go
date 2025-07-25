@@ -1,7 +1,7 @@
-# need a function to calculate the vector between two points
-# need a function to calculate the angle between two vectors
-
-
+import math 
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
+from urllib.parse import urlparse, parse_qs
 
 def GetVectorConstructor(dim , dim_name):
     def CreateVector(**kwargs):
@@ -53,14 +53,114 @@ def CheckIfTwoVectorsFallInTheVectorSpace(vec2 , vec1):
 
 
 
+def GetAngleWrapper(vec2 , vec1):
+    rad , flag = GetSignedAngle2D(vec1 , vec2)
+    if not flag:
+        return None 
+    return RadiansToDegrees(rad)
 
 
 
-vectors_2D = GetVectorConstructor(2 , ['x' , 'y'])
+def GetSignedAngle2D(vec2, vec1):
+    if not CheckIfTwoVectorsFallInTheVectorSpace(vec2, vec1):
+        return None, False
+    
+    # Only supports 2D vectors
+    if vec2["dim"] != 2 or set(vec2["dim_name"]) != {"x", "y"}:
+        raise Exception("Only 2D vectors with 'x' and 'y' components are supported.")
 
-vec1 = vectors_2D(x = 1 , y = 2)
-vec2 = vectors_2D(x = 4 , y = 5)
-print(GetResultantVector(vec2 , vec1))
+    x1, y1 = vec1["x"], vec1["y"]
+    x2, y2 = vec2["x"], vec2["y"]
+
+    dot = x1 * x2 + y1 * y2
+    det = x1 * y2 - y1 * x2  # determinant (like 2D cross product)
+
+    angle_radians = math.atan2(det, dot)
+    return angle_radians, True
+
+def RadiansToDegrees(radians):
+    return math.degrees(radians)
+
+def ParseListToVectors(list_dicts, callback):
+    return map(lambda d: callback(**d), list_dicts)
+
+vector_2d = GetVectorConstructor(2 , ['x' , 'y'])
+
+
+class MyHandler(BaseHTTPRequestHandler):
+
+    def do_POST(self):
+        content_length = int(self.headers.get('Content-Length', 0))
+        raw_body = self.rfile.read(content_length)
+        body_str = raw_body.decode('utf-8')
+        print("Raw body string:", body_str)
+        try:
+            data = json.loads(body_str)
+            print("Parsed JSON:", data)
+            # print("firest data point ", type(data[0]))
+            test = ParseListToVectors(data , vector_2d)
+            for item in test:
+                print(item)
+            print("printing out the test variable ")
+            print(test)
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
+
+        # 5. Respond with something
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        response = {"status": "received", "data": data}
+        self.wfile.write(json.dumps(response).encode('utf-8'))
+
+def run():
+    server = HTTPServer(('0.0.0.0', 8080), MyHandler)
+    print("Listening on http://localhost:8080")
+    server.serve_forever()
+run()
+
+# vectors_2D = GetVectorConstructor(2 , ['x' , 'y'])
+
+# vec1 = vectors_2D(x = 1 , y = 2)
+# vec2 = vectors_2D(x = 4 , y = 5)
+
+# print(GetAngleWrapper(vec2 , vec1))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
