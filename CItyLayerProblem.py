@@ -3,7 +3,7 @@ import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
-
+# don't use classes in python xD
 def make_vector_factory(dim: int, dim_names: list[str]):
     def create_vector(**kwargs):
         if len(kwargs) != dim:
@@ -85,6 +85,7 @@ def total_rotation_angle(vector_list):
         angle = angle_between_vectors(prev, current)
         if angle is None:
             raise ValueError("Failed to calculate angle between vectors")
+        print('calculated angle ',angle)
         total_angle += angle
         prev = current
 
@@ -131,11 +132,11 @@ def run_server():
 
 
 if __name__ == "__main__":
-    #run_server()
-    vector_2d_constructor = make_vector_factory(2 , ['x' , 'y'])
-    vec1 = vector_2d_constructor(x=1 , y=1)
-    vec2 = vector_2d_constructor(x=4 , y=5)
-    vec3 = subtract_vectors(vec2 , vec1)
-    angle = angle_between_vectors(vec1 , vec2)
-    print(angle)
+    run_server()
+    # vector_2d_constructor = make_vector_factory(2 , ['x' , 'y'])
+    # vec1 = vector_2d_constructor(x=1 , y=1)
+    # vec2 = vector_2d_constructor(x=4 , y=5)
+    # vec3 = subtract_vectors(vec2 , vec1)
+    # angle = angle_between_vectors(vec1 , vec2)
+    # print(angle)
     #print(vec3)
