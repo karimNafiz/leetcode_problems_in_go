@@ -3,6 +3,9 @@ import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
+STATE = 0
+#{ STATE = 0 -> DEBUG, STATE = 1 -> PRODUCTION}
+
 # don't use classes in python xD
 def make_vector_factory(dim: int, dim_names: list[str]):
     def create_vector(**kwargs):
@@ -19,6 +22,24 @@ def make_vector_factory(dim: int, dim_names: list[str]):
         vector["dim_name"] = list(dim_names)
         return vector
     return create_vector
+
+def make_vector_factory_n(dim: int, dim_names: list[str]):
+    def create_vector(coords: list[float]):
+        if len(coords) != dim:
+            raise ValueError("Dimension mismatch")
+        vector = {}
+        for name, val in zip(dim_names, coords):
+            vector[name] = val
+        vector['dim'] = dim
+        vector['dim_name'] = dim_names
+        return vector  
+    return create_vector
+
+def make_vectors_frm_list_nums(col:list[list[float]], vector_factory):
+    return [vector_factory(cords) for cords in col]
+            
+
+
 
 
 def subtract_vectors(v1, v2):
@@ -78,18 +99,86 @@ def total_rotation_angle(vector_list):
 
     origin = vector_list[0]
     prev = subtract_vectors(origin, vector_list[1])
+    if STATE == 0:
+        print('prev vector ', prev)
     total_angle = 0
 
     for vec in vector_list[2:]:
+        if STATE == 0:
+            print("origin vector ",origin)
+            print("current vector ",vec)
         current = subtract_vectors(origin, vec)
+        if STATE == 0:
+            print('current vector ', current)
         angle = angle_between_vectors(prev, current)
         if angle is None:
             raise ValueError("Failed to calculate angle between vectors")
-        print('calculated angle ',angle)
+        if STATE == 0:
+            print('angle calculate ',angle)
+        #print('calculated angle ',angle)
         total_angle += angle
         prev = current
 
     return total_angle
+
+
+import json
+
+# Load entire GeoJSON into memory
+with open('mtlbld_v4.geojson', 'r') as f:
+    geojson_data = json.load(f)
+
+
+print('no of features ',len(geojson_data['features']))
+vector_2d_constructor = make_vector_factory_n(2 , ['x', 'y'])
+
+
+for feature in geojson_data['features']:
+    try:
+        geometry = feature['geometry']
+        # making lower case to avoid stupid issues
+        if str.lower(geometry['type']) != 'polygon':
+            continue
+        # we are only dealing with a polygon so we need the first element
+        coordinates = geometry['coordinates'][0] 
+        vector_list = make_vectors_frm_list_nums(coordinates , vector_2d_constructor)
+        angle_sum = total_rotation_angle(vector_list)
+        print()
+        print(angle_sum)
+        print('objectID',feature['properties']['OBJECTID'])
+        print()
+        break
+
+    except:
+        continue
+
+
+
+
+# # Create an iterator over the features list
+# features_iter = iter(geojson_data['features'])
+
+# # Get the next feature
+# first_feature = next(features_iter)
+# print('first feature type ', type(first_feature['geometry']['coordinates']))
+# print("First feature geometry:", first_feature['geometry']['coordinates'][0][0])
+
+#print("First feature properties:", first_feature['properties'])
+#print(total_rotation_angle(polygon))
+
+
+
+
+
+
+
+
+
+
+
+# need a function to load the geojson
+# parse the geojson
+
 
 
 class VectorHandler(BaseHTTPRequestHandler):
@@ -131,8 +220,8 @@ def run_server():
     server.serve_forever()
 
 
-if __name__ == "__main__":
-    run_server()
+# if __name__ == "__main__":
+    
     # vector_2d_constructor = make_vector_factory(2 , ['x' , 'y'])
     # vec1 = vector_2d_constructor(x=1 , y=1)
     # vec2 = vector_2d_constructor(x=4 , y=5)
